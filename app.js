@@ -165,7 +165,7 @@ const PDFParser = {
   // Regex patterns ported exactly from pdf_parser.py
   HEADING_RE:            /(?<klasse>[^[\-]+?)\s*(?:\[[^\]]+\])?\s*[–\-|/]\s*(?<art>[^–\-|/]+?)\s*[–\-|/]\s*(?:(?<lauf_nr>\d+)\s*[–\-|/]\s*)?(?<gruppe>Gruppe\s+\S+)/i,
   FINALE_HEADING_RE:     /(?<art>[A-Z]-Finale)\s+(?<klasse>[^\n]+)/i,
-  TEXT_DATA_ROW_RE:      /^\d+\.\s+(?:\d{4,6}\s+){0,2}(?<name>[A-ZÄÖÜ][^/\n]+?)(?=\s+(?:[A-Z]{3}\b|\d+\/\d)|$)/u,
+  TEXT_DATA_ROW_RE:      /^\d+\.\s+(?:\d{1,6}\s+){0,3}(?<name>[A-ZÄÖÜ][^/\n]+?)(?=\s+(?:[A-Z]{3}\b|\d+\/\d)|$)/u,
   ZEITPLAN_FINALE_ROW_RE:/^(?<zeit>\d{1,2}:\d{2})\s+(?:\d{1,2}:\d{2}\s+)?(?<nr>\d+)\.\s+(?<art>[A-Z]-Finale)\s+(?<klasse>\S.*)/i,
   FINALE_NAME_RE:        /(?<!\d)(?<lastname>[A-ZÄÖÜ][a-zA-ZäöüÄÖÜß\-]{1,25}),\s*(?<firstname>[A-ZÄÖÜ][a-zA-ZäöüÄÖÜß\-]{1,25})/u,
   SKIP_RE:               /^(#|nr|pos|name|fahrer|teilnehmer|startposition|start\s*nr|platz|\s*)$/i,
@@ -178,31 +178,52 @@ const PDFParser = {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pageTexts = [];
+
       for (let p = 1; p <= pdf.numPages; p++) {
-        const page  = await pdf.getPage(p);
-        const tc    = await page.getTextContent();
-        // Group items by y-band (same line = within 3pt), join with space; lines join with \n
-        const lines = [];
-        let currentY = null;
-        let currentLine = [];
+        const page = await pdf.getPage(p);
+        const tc   = await page.getTextContent();
+
+        // Collect all text items with their coordinates
+        const items = [];
         for (const item of tc.items) {
-          if (!item.str) continue;
-          const y = Math.round(item.transform[5]);
-          if (currentY === null) {
-            currentY = y;
-          } else if (Math.abs(y - currentY) > 3) {
-            if (currentLine.length) lines.push(currentLine.join(' '));
-            currentLine = [];
-            currentY = y;
-          }
-          currentLine.push(item.str);
+          const s = item.str;
+          if (!s || !s.trim()) continue;
+          items.push({ str: s.trim(), x: item.transform[4], y: item.transform[5] });
         }
-        if (currentLine.length) lines.push(currentLine.join(' '));
-        pageTexts.push(lines.join('\n'));
+
+        if (!items.length) { pageTexts.push(''); continue; }
+
+        // Sort top-to-bottom (PDF y=0 is bottom, so DESC = top first)
+        // then left-to-right within each line
+        items.sort((a, b) => b.y - a.y || a.x - b.x);
+
+        // Group into lines: items within 5pt vertically are on the same line
+        const YTOL = 5;
+        const lineGroups = [];
+        let group = [items[0]];
+
+        for (let i = 1; i < items.length; i++) {
+          const item    = items[i];
+          const groupY  = group[0].y;
+          if (Math.abs(item.y - groupY) <= YTOL) {
+            group.push(item);
+          } else {
+            // Sort items within line by x (left → right)
+            group.sort((a, b) => a.x - b.x);
+            lineGroups.push(group.map(it => it.str).join(' '));
+            group = [item];
+          }
+        }
+        group.sort((a, b) => a.x - b.x);
+        lineGroups.push(group.map(it => it.str).join(' '));
+
+        const pageText = lineGroups.join('\n');
+        console.debug(`[PDFParser] Seite ${p} — ${lineGroups.length} Zeilen extrahiert`);
+        pageTexts.push(pageText);
       }
       return pageTexts;
     } catch (e) {
-      console.error('pdf.js extraction error:', e);
+      console.error('[PDFParser] Fehler bei der Textextraktion:', e);
       return null;
     }
   },
