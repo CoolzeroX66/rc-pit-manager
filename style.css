@@ -1,0 +1,814 @@
+/* ── 1. CSS Variables ──────────────────────────────────────────────────────── */
+:root {
+  --bg:        #0d1117;
+  --bg-card:   #161b22;
+  --bg-nav:    #010409;
+  --accent:    #f97316;
+  --vorlauf:   #3b82f6;
+  --final:     #ef4444;
+  --text:      #e6edf3;
+  --muted:     #8b949e;
+  --border:    #30363d;
+  --success:   #22c55e;
+  --warn-15:   #facc15;
+  --warn-5:    #f97316;
+}
+
+/* ── 2. Reset / Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', 'Segoe UI', system-ui, sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.4;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+button { cursor: pointer; font-family: inherit; border: none; }
+input, select { font-family: inherit; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ── 3. Typography ─────────────────────────────────────────────────────────── */
+.font-racing { font-family: 'Oswald', 'Arial Narrow', sans-serif; }
+
+.title-brand {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+/* ── 4. Layout / Views ─────────────────────────────────────────────────────── */
+.view { display: none; min-height: 100dvh; }
+.view.active { display: block; }
+.hidden { display: none !important; }
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* ── 5. Navigation ─────────────────────────────────────────────────────────── */
+.nav {
+  background-color: var(--bg-nav);
+  border-bottom: 2px solid var(--accent);
+  padding: 0.65rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-actions { display: flex; gap: 0.5rem; }
+
+.btn-nav {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  min-height: 36px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-nav:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── 6. Setup View ─────────────────────────────────────────────────────────── */
+.setup-header {
+  text-align: center;
+  padding: 2.5rem 1rem 1.5rem;
+}
+
+.setup-logo {
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.setup-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.setup-subtitle {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.35rem;
+  letter-spacing: 1px;
+}
+
+.setup-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.setup-card-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.setup-step-badge {
+  background: var(--accent);
+  color: #000;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-upload-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.4rem;
+}
+
+.file-input-wrapper {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.file-input-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  min-height: 48px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.file-input-custom:hover { border-color: var(--accent); }
+.file-input-custom.has-file { border-color: var(--success); }
+
+.file-input-custom input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.file-icon { font-size: 1.1rem; flex-shrink: 0; }
+.file-name { font-size: 0.9rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name.selected { color: var(--success); }
+
+.parse-status {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  display: none;
+}
+.parse-status.success { display: block; background: rgba(34,197,94,0.12); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+.parse-status.error   { display: block; background: rgba(239,68,68,0.12);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+.parse-status.loading { display: block; background: rgba(249,115,22,0.1);  color: var(--accent); border: 1px solid rgba(249,115,22,0.3); }
+
+.zeitplan-preview {
+  margin-top: 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.zeitplan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.zeitplan-table th {
+  background: rgba(249,115,22,0.1);
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+.zeitplan-table td {
+  background: var(--bg-card);
+  color: var(--text);
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid rgba(48,54,61,0.5);
+  vertical-align: middle;
+}
+.zeitplan-table .zeit-cell {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Driver select */
+.driver-select-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.racing-select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  font-size: 1rem;
+  font-family: 'Rajdhani', sans-serif;
+  min-height: 48px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-right: 2.5rem;
+}
+.racing-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(249,115,22,0.2); }
+.racing-select option { background: var(--bg-card); color: var(--text); }
+
+/* Demo button area */
+.demo-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.demo-divider::before, .demo-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── 7. Buttons ────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: background-color 0.15s, transform 0.1s, opacity 0.15s;
+  min-height: 48px;
+  padding: 0 1.25rem;
+  font-size: 0.95rem;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1rem;
+}
+.btn-primary:hover:not(:disabled) { background: #ea6c00; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 0.9rem;
+}
+.btn-secondary:hover:not(:disabled) { background: rgba(249,115,22,0.1); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--final);
+  border: 1px solid var(--final);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.85rem;
+  min-height: 40px;
+}
+.btn-danger:hover:not(:disabled) { background: rgba(239,68,68,0.1); }
+
+.btn-full { width: 100%; }
+
+/* ── 8. Dashboard View ─────────────────────────────────────────────────────── */
+
+/* Driver header */
+.driver-header {
+  padding: 1.5rem 1rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.driver-name {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: clamp(1.8rem, 7vw, 3rem);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+
+.driver-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25em 0.85em;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.badge-klasse { background: var(--accent); color: #000; }
+.badge-gruppe { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+.badge-vorlauf-type { background: var(--vorlauf); color: #fff; }
+.badge-final-type   { background: var(--final); color: #fff; }
+
+/* ── 9. Race Progress Bar ──────────────────────────────────────────────────── */
+.race-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg-nav);
+  border-bottom: 1px solid var(--border);
+}
+
+.progress-dot {
+  width: 28px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.progress-dot.vorlauf.done     { background: var(--vorlauf); opacity: 0.5; }
+.progress-dot.vorlauf.active   { background: var(--vorlauf); box-shadow: 0 0 8px var(--vorlauf); }
+.progress-dot.vorlauf.pending  { background: var(--border); }
+.progress-dot.finale.done      { background: var(--final); opacity: 0.5; }
+.progress-dot.finale.active    { background: var(--final); box-shadow: 0 0 8px var(--final); animation: dot-pulse 1s ease-in-out infinite; }
+.progress-dot.finale.pending   { background: var(--border); }
+
+.progress-sep {
+  width: 12px;
+  height: 2px;
+  background: var(--border);
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── 10. Race Card (current race) ──────────────────────────────────────────── */
+.race-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin: 1rem;
+  overflow: hidden;
+  transition: box-shadow 0.3s;
+}
+
+.race-card.active-vorlauf { border-left: 4px solid var(--vorlauf); box-shadow: 0 0 0 1px var(--vorlauf), 0 0 24px rgba(59,130,246,0.2); }
+.race-card.active-finale  { border-left: 4px solid var(--final);   box-shadow: 0 0 0 1px var(--final),   0 0 24px rgba(239,68,68,0.2); }
+
+.race-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.race-label {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.race-card-body {
+  padding: 1.25rem 1rem 1rem;
+}
+
+/* Scheduled time */
+.scheduled-time-section {
+  text-align: center;
+  margin-bottom: 0.75rem;
+}
+
+.scheduled-time-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
+.scheduled-time-value {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: clamp(2.5rem, 10vw, 4rem);
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+  line-height: 1;
+}
+
+.scheduled-time-tbd {
+  font-size: 1rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Countdown */
+.countdown-section {
+  text-align: center;
+  padding: 0.75rem 0 0.5rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+.countdown-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.countdown-value {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: clamp(4rem, 18vw, 7rem);
+  font-weight: 700;
+  letter-spacing: 4px;
+  line-height: 1;
+  transition: color 0.5s;
+}
+
+.countdown-far     { color: var(--text); }
+.countdown-soon    { color: var(--warn-15); }
+.countdown-urgent  { color: var(--accent); animation: pulse-glow 1s ease-in-out infinite; }
+.countdown-running { color: var(--final); animation: blink-slow 1.2s ease-in-out infinite; }
+.countdown-done    { color: var(--muted); }
+
+@keyframes pulse-glow {
+  0%, 100% { text-shadow: 0 0 12px rgba(249,115,22,0.6); }
+  50%       { text-shadow: 0 0 24px rgba(249,115,22,1); }
+}
+
+@keyframes blink-slow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+.status-msg {
+  text-align: center;
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0.5rem;
+  border-radius: 6px;
+  margin-top: 0.25rem;
+}
+.status-msg.running { background: rgba(239,68,68,0.12); color: var(--final); }
+.status-msg.done    { background: rgba(34,197,94,0.1);  color: var(--success); }
+
+/* ── 11. Adjust Buttons ────────────────────────────────────────────────────── */
+.adjust-section {
+  padding: 0 1rem 1rem;
+}
+
+.adjust-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.adjust-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.btn-adjust {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  min-height: 52px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn-adjust[data-delta^="-"] { color: var(--final); border-color: rgba(239,68,68,0.3); }
+.btn-adjust[data-delta^="-"]:hover { background: rgba(239,68,68,0.1); border-color: var(--final); }
+.btn-adjust[data-delta]:not([data-delta^="-"]) { color: var(--success); border-color: rgba(34,197,94,0.3); }
+.btn-adjust[data-delta]:not([data-delta^="-"]):hover { background: rgba(34,197,94,0.1); border-color: var(--success); }
+.btn-adjust:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.offset-display {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.4rem;
+}
+.offset-display.nonzero { color: var(--warn-15); }
+
+/* ── 12. Race List ─────────────────────────────────────────────────────────── */
+.race-list {
+  margin: 0 1rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.race-list-header {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--muted);
+  padding: 0.5rem 0.85rem;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border);
+}
+
+.race-list-row {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid rgba(48,54,61,0.5);
+  transition: background 0.15s;
+}
+.race-list-row:last-child { border-bottom: none; }
+.race-list-row.current { background: rgba(249,115,22,0.07); }
+.race-list-row.done    { opacity: 0.45; }
+
+.race-list-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 0.6rem;
+  flex-shrink: 0;
+  background: var(--border);
+}
+.race-list-dot.vorlauf { background: var(--vorlauf); }
+.race-list-dot.finale  { background: var(--final); }
+.race-list-dot.done    { background: var(--success); }
+.race-list-dot.current { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+.race-list-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+  color: var(--text);
+}
+.race-list-row.done .race-list-label { text-decoration: line-through; color: var(--muted); }
+.race-list-row.current .race-list-label { color: var(--accent); }
+
+.race-list-time {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.race-list-row.current .race-list-time { color: var(--accent); }
+
+.race-list-status {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin-left: 0.5rem;
+  min-width: 36px;
+  text-align: right;
+}
+.race-list-row.done .race-list-status { color: var(--success); }
+.race-list-row.current .race-list-status { color: var(--accent); }
+
+/* ── 13. Summary View ──────────────────────────────────────────────────────── */
+.summary-header {
+  text-align: center;
+  padding: 2.5rem 1rem 1.5rem;
+}
+
+.summary-icon { font-size: 4rem; line-height: 1; margin-bottom: 0.75rem; }
+
+.summary-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--success);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--success);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin: 0 1rem 1rem;
+}
+
+.summary-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+.summary-stat:last-child { border-bottom: none; }
+.summary-stat-label { color: var(--muted); }
+.summary-stat-value { color: var(--text); font-weight: 700; }
+
+/* ── 14. Modal ─────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(1,4,9,0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+  animation: overlay-in 0.2s ease;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal-box {
+  background: var(--bg-card);
+  border: 2px solid var(--accent);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 380px;
+  overflow: hidden;
+  animation: modal-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modal-in {
+  from { transform: scale(0.85) translateY(20px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+.modal-icon-wrap { font-size: 2.5rem; line-height: 1; margin-bottom: 0.5rem; }
+
+.modal-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.modal-title.warn-15 { color: var(--warn-15); }
+.modal-title.warn-5  { color: var(--final); }
+
+.modal-body-text {
+  padding: 1.25rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--text);
+  text-align: center;
+}
+
+.modal-footer {
+  padding: 0 1.25rem 1.25rem;
+}
+
+.btn-modal-confirm {
+  width: 100%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 0.9rem;
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  min-height: 54px;
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-modal-confirm:active { transform: scale(0.97); }
+.btn-modal-confirm:hover  { background: #ea6c00; }
+
+/* ── 15. Spinner / Loading ─────────────────────────────────────────────────── */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(249,115,22,0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 16. Utility ───────────────────────────────────────────────────────────── */
+.mt-1  { margin-top: 0.5rem; }
+.mt-2  { margin-top: 1rem; }
+.mt-3  { margin-top: 1.5rem; }
+.mb-1  { margin-bottom: 0.5rem; }
+.mb-2  { margin-bottom: 1rem; }
+.text-muted   { color: var(--muted); }
+.text-accent  { color: var(--accent); }
+.text-success { color: var(--success); }
+.text-center  { text-align: center; }
+.text-sm      { font-size: 0.85rem; }
+
+/* ── 17. Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 380px) {
+  .adjust-buttons { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .scheduled-time-value { font-size: 2.2rem; }
+  .countdown-value { font-size: clamp(3.5rem, 16vw, 6rem); }
+}
+
+@media (min-width: 481px) {
+  .container { padding: 0 1.5rem; }
+  .race-card { margin: 1rem 1.5rem; }
+  .adjust-section { padding: 0 1.5rem 1rem; }
+  .race-list { margin: 0 1.5rem 1.5rem; }
+}
+
+/* ── 18. Scrollbar (webkit) ────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }

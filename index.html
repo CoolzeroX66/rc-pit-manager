@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#010409">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>RC Pit Manager – Godzilla Racing 66</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet" media="all">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ NAV ═══ -->
+<nav class="nav" id="nav">
+  <span class="title-brand">&#127950; RC PIT &middot; GR66</span>
+  <div class="nav-actions">
+    <button class="btn-nav" id="btn-nav-settings" title="Einstellungen">&#9881; Setup</button>
+    <button class="btn-nav hidden" id="btn-nav-reset" title="Zurücksetzen">&#10006; Reset</button>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════ SETUP VIEW ═══ -->
+<section id="view-setup" class="view active">
+  <div class="container">
+
+    <div class="setup-header">
+      <div class="setup-logo">&#127950;</div>
+      <div class="setup-title">RC Pit Manager</div>
+      <div class="setup-subtitle">Godzilla Racing 66 &middot; RC Car Renn-Assistent</div>
+    </div>
+
+    <!-- Step 1: PDF Import -->
+    <div id="step-upload">
+      <div class="setup-card">
+        <div class="setup-card-title">
+          <span class="setup-step-badge">1</span>
+          PDFs importieren
+        </div>
+
+        <!-- Gruppeneinteilung -->
+        <label class="file-upload-label">Gruppeneinteilung</label>
+        <div class="file-input-wrapper">
+          <div class="file-input-custom" id="drop-gruppen">
+            <input type="file" id="input-gruppen" accept=".pdf" aria-label="Gruppeneinteilung PDF">
+            <span class="file-icon">&#128196;</span>
+            <span class="file-name" id="fname-gruppen">PDF-Datei auswählen…</span>
+          </div>
+        </div>
+        <div class="parse-status" id="status-gruppen"></div>
+
+        <!-- Zeitplan -->
+        <label class="file-upload-label mt-2">Zeitplan</label>
+        <div class="file-input-wrapper">
+          <div class="file-input-custom" id="drop-zeitplan">
+            <input type="file" id="input-zeitplan" accept=".pdf" aria-label="Zeitplan PDF">
+            <span class="file-icon">&#128197;</span>
+            <span class="file-name" id="fname-zeitplan">PDF-Datei auswählen…</span>
+          </div>
+        </div>
+        <div class="parse-status" id="status-zeitplan"></div>
+
+        <!-- Zeitplan preview table -->
+        <div id="zeitplan-preview-wrap" class="hidden">
+          <div class="zeitplan-preview mt-2">
+            <table class="zeitplan-table">
+              <thead>
+                <tr>
+                  <th>Startzeit</th>
+                  <th>Klasse</th>
+                  <th>Gruppe</th>
+                  <th>Lauf</th>
+                </tr>
+              </thead>
+              <tbody id="zeitplan-preview-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-divider">oder</div>
+
+      <button class="btn btn-secondary btn-full mb-2" id="btn-demo">
+        &#9654; Demo-Modus starten
+      </button>
+    </div>
+
+    <!-- Step 2: Driver Selection -->
+    <div id="step-driver" class="hidden">
+      <div class="setup-card">
+        <div class="setup-card-title">
+          <span class="setup-step-badge">2</span>
+          Fahrer auswählen
+        </div>
+
+        <label class="driver-select-label" for="select-driver">Dein Name</label>
+        <select class="racing-select" id="select-driver">
+          <option value="">— Fahrer wählen —</option>
+        </select>
+
+        <div id="driver-preview" class="hidden mt-2">
+          <div style="background:rgba(249,115,22,0.07);border:1px solid rgba(249,115,22,0.25);border-radius:8px;padding:0.75rem;">
+            <div class="text-sm text-muted mb-1">Erkannte Daten:</div>
+            <div id="driver-preview-text" style="font-size:0.9rem;color:var(--text);"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full mt-2" id="btn-open-dashboard" disabled>
+          &#9654; Dashboard öffnen
+        </button>
+
+        <button class="btn btn-secondary btn-full mt-1" id="btn-back-step1"
+                style="min-height:40px;font-size:0.82rem;">
+          &#8592; Zurück zu PDFs
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</section>
+
+<!-- ════════════════════════════════════════════ DASHBOARD VIEW ═══ -->
+<section id="view-dashboard" class="view">
+
+  <!-- Driver header -->
+  <div class="driver-header container" id="driver-header">
+    <div class="driver-name" id="dash-driver-name">—</div>
+    <div class="driver-meta">
+      <span class="badge badge-klasse" id="dash-badge-klasse">—</span>
+      <span class="badge badge-gruppe" id="dash-badge-gruppe">—</span>
+    </div>
+  </div>
+
+  <!-- Progress bar: 6 race dots -->
+  <div class="race-progress" id="race-progress" aria-label="Rennen-Fortschritt">
+    <div class="progress-dot vorlauf pending" data-index="0" title="Vorlauf 1"></div>
+    <div class="progress-dot vorlauf pending" data-index="1" title="Vorlauf 2"></div>
+    <div class="progress-dot vorlauf pending" data-index="2" title="Vorlauf 3"></div>
+    <div class="progress-sep"></div>
+    <div class="progress-dot finale pending" data-index="3" title="Finale 1"></div>
+    <div class="progress-dot finale pending" data-index="4" title="Finale 2"></div>
+    <div class="progress-dot finale pending" data-index="5" title="Finale 3"></div>
+  </div>
+
+  <!-- Current race card -->
+  <div class="race-card" id="race-card">
+    <div class="race-card-header">
+      <div class="race-label">
+        <span class="badge" id="dash-race-type-badge">Vorlauf</span>
+        &nbsp;<span id="dash-race-label">Vorlauf 1</span>
+      </div>
+      <div>
+        <span class="badge badge-gruppe" id="dash-race-gruppe">Gruppe A</span>
+      </div>
+    </div>
+    <div class="race-card-body">
+      <!-- Scheduled time -->
+      <div class="scheduled-time-section">
+        <div class="scheduled-time-label">Startzeit</div>
+        <div class="scheduled-time-value" id="dash-scheduled-time">--:--</div>
+      </div>
+
+      <!-- Countdown -->
+      <div class="countdown-section">
+        <div class="countdown-label">Countdown</div>
+        <div class="countdown-value countdown-far" id="dash-countdown">--:--</div>
+        <div class="status-msg hidden" id="dash-status-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time adjustment buttons -->
+  <div class="adjust-section">
+    <div class="adjust-label">Zeitplan anpassen</div>
+    <div class="adjust-buttons">
+      <button class="btn-adjust" data-delta="-300">−5 Min</button>
+      <button class="btn-adjust" data-delta="-60">−1 Min</button>
+      <button class="btn-adjust" data-delta="60">+1 Min</button>
+      <button class="btn-adjust" data-delta="300">+5 Min</button>
+    </div>
+    <div class="offset-display" id="offset-display">Kein Versatz aktiv</div>
+  </div>
+
+  <!-- All races list -->
+  <div class="race-list" id="race-list">
+    <div class="race-list-header">Alle Läufe</div>
+    <!-- rows injected by JS -->
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════ SUMMARY VIEW ═══ -->
+<section id="view-summary" class="view">
+  <div class="container">
+    <div class="summary-header">
+      <div class="summary-icon">&#127942;</div>
+      <div class="summary-title">Rennen beendet!</div>
+      <div class="text-muted mt-1" style="font-size:0.9rem;">Alle Läufe abgeschlossen</div>
+    </div>
+
+    <div class="summary-card" id="summary-card">
+      <!-- injected by JS -->
+    </div>
+
+    <div class="container mb-2 mt-2">
+      <button class="btn btn-primary btn-full" id="btn-new-event">
+        &#10011; Neues Event starten
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ MODAL ═══ -->
+<div class="modal-overlay hidden" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-icon-wrap" id="modal-icon">&#9888;</div>
+      <div class="modal-title" id="modal-title-text">Achtung</div>
+    </div>
+    <div class="modal-body-text" id="modal-body-text">
+      Nachricht
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-confirm" id="btn-modal-confirm">
+        &#10003; Erledigt / Bestätigt
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- pdf.js CDN — sets window.pdfjsLib = null on failure -->
+<script>
+  window.pdfjsLib = null;
+</script>
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"
+  onload="pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js';"
+  onerror="console.warn('pdf.js konnte nicht geladen werden – Demo-Modus empfohlen.');"
+></script>
+<script src="app.js"></script>
+</body>
+</html>
