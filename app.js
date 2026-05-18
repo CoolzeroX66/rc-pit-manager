@@ -151,9 +151,9 @@ const ModalController = {
   _queue:  [],
   _active: false,
 
-  show(minutes) {
+  show(minutes, klasse) {
     if (this._active) {
-      this._queue.push(minutes);
+      this._queue.push({ minutes, klasse });
       return;
     }
     this._active = true;
@@ -166,12 +166,12 @@ const ModalController = {
 
     if (minutes === 15) {
       icon.textContent  = '🚗';
-      title.textContent = '15 Minuten – Vorbereitung!';
+      title.textContent = klasse ? `15 Min – Haftmittel! (${klasse})` : '15 Minuten – Vorbereitung!';
       title.className   = 'modal-title warn-15';
       body.innerHTML    = '<strong>Haftmittel auf die Reifen auftragen!</strong><br><br>Stelle sicher, dass die Reifen gleichmäßig behandelt sind.';
     } else {
       icon.textContent  = '⚠️';
-      title.textContent = '5 Minuten – Abnahme!';
+      title.textContent = klasse ? `5 Min – Abnahme! (${klasse})` : '5 Minuten – Abnahme!';
       title.className   = 'modal-title warn-5';
       body.innerHTML    = '<strong>Technische Abnahme steht an!</strong><br><br>Bitte Fahrzeug sofort zur Abnahme vorführen.';
     }
@@ -183,7 +183,10 @@ const ModalController = {
   confirm() {
     document.getElementById('modal-overlay').classList.add('hidden');
     this._active = false;
-    if (this._queue.length > 0) this.show(this._queue.shift());
+    if (this._queue.length > 0) {
+      const next = this._queue.shift();
+      this.show(next.minutes, next.klasse);
+    }
   }
 };
 
@@ -419,200 +422,205 @@ const PDFParser = {
    ════════════════════════════════════════════════════════════════════════════ */
 const DashboardRenderer = {
   renderAll() {
-    this.renderClassTabs();
     this.renderDriverHeader();
-    this.renderProgressBar();
-    this.renderCurrentRace();
-    this.renderRaceList();
-    this.renderOffsetDisplay();
-  },
-
-  renderClassTabs() {
-    const d      = State.data;
-    const tabsEl = document.getElementById('class-tabs');
-    if (!d || !d.dashboards || d.dashboards.length <= 1) {
-      tabsEl.classList.add('hidden');
-      return;
-    }
-
-    tabsEl.classList.remove('hidden');
-    tabsEl.innerHTML = '';
-    d.dashboards.forEach((dash, i) => {
-      const allDone = dash.races.every(r => r.status === 'done');
-      const btn = document.createElement('button');
-      btn.className  = 'class-tab';
-      btn.textContent = dash.driverClass;
-      btn.setAttribute('role', 'tab');
-      btn.setAttribute('aria-selected', String(i === d.activeDashboardIndex));
-      if (i === d.activeDashboardIndex) btn.classList.add('active');
-      if (allDone) btn.classList.add('done');
-      btn.addEventListener('click', () => {
-        if (i === State.data.activeDashboardIndex) return;
-        State.setActiveDashboard(i);
-        DashboardRenderer.renderAll();
-      });
-      tabsEl.appendChild(btn);
-    });
+    this.renderClassPanels();
   },
 
   renderDriverHeader() {
-    const d    = State.data;
-    const dash = State.activeDashboard;
-    if (!d || !dash) return;
-    document.getElementById('dash-driver-name').textContent  = d.driverName  || '—';
-    document.getElementById('dash-badge-klasse').textContent = dash.driverClass || '—';
-    document.getElementById('dash-badge-gruppe').textContent = dash.driverGroup || '—';
+    const d = State.data;
+    if (!d) return;
+    document.getElementById('dash-driver-name').textContent = d.driverName || '—';
   },
 
-  renderProgressBar() {
-    const dash = State.activeDashboard;
-    if (!dash) return;
-    const dots = document.querySelectorAll('.progress-dot');
-    dots.forEach((dot, i) => {
-      const race = dash.races[i];
-      if (!race) return;
-      dot.className = `progress-dot ${i < 3 ? 'vorlauf' : 'finale'}`;
-      if (race.status === 'done') {
-        dot.classList.add('done');
-      } else if (i === dash.currentRaceIndex) {
-        dot.classList.add('active');
-      } else {
-        dot.classList.add('pending');
-      }
+  _soonestDashIdx() {
+    const d = State.data;
+    if (!d) return -1;
+    let idx = -1, best = Infinity;
+    d.dashboards.forEach((dash, i) => {
+      if (dash.races.every(r => r.status === 'done')) return;
+      const race = dash.races[dash.currentRaceIndex];
+      if (!race || !race.scheduledTimeISO) return;
+      const ms = new Date(race.scheduledTimeISO).getTime() + (dash.globalOffsetMs || 0);
+      if (ms < best) { best = ms; idx = i; }
+    });
+    return idx;
+  },
+
+  renderClassPanels() {
+    const d = State.data;
+    if (!d || !d.dashboards) return;
+    const container = document.getElementById('class-panels');
+    container.innerHTML = '';
+    container.className = d.dashboards.length > 1 ? 'class-panels multi' : 'class-panels';
+    const soonestIdx = this._soonestDashIdx();
+    d.dashboards.forEach((dash, i) => {
+      container.appendChild(this._buildPanel(d, dash, i, i === soonestIdx));
     });
   },
 
-  renderCurrentRace() {
-    const race = State.currentRace;
-    const dash = State.activeDashboard;
-    if (!race || !dash) return;
-
-    const isFinale  = race.type === 'Finale';
-    const card      = document.getElementById('race-card');
-    card.className  = `race-card ${isFinale ? 'active-finale' : 'active-vorlauf'}`;
-
-    const typeBadge     = document.getElementById('dash-race-type-badge');
-    typeBadge.textContent = race.type;
-    typeBadge.className   = `badge ${isFinale ? 'badge-final-type' : 'badge-vorlauf-type'}`;
-
-    document.getElementById('dash-race-label').textContent  = race.label;
-    document.getElementById('dash-race-gruppe').textContent = race.group || dash.driverGroup;
-
-    this.renderScheduledTime();
-  },
-
-  renderScheduledTime() {
-    const race = State.currentRace;
-    const el   = document.getElementById('dash-scheduled-time');
-    if (!race || !race.scheduledTimeISO) {
-      el.textContent = 'Zeit TBD';
-      el.classList.add('scheduled-time-tbd');
-      return;
+  renderPanel(dashIdx) {
+    const d = State.data;
+    if (!d || !d.dashboards[dashIdx]) return;
+    const old = document.getElementById(`cp-${dashIdx}`);
+    if (!old) { this.renderClassPanels(); return; }
+    const wasCollapsed = old.querySelector('.race-list')?.classList.contains('collapsed') ?? null;
+    const soonestIdx = this._soonestDashIdx();
+    const newPanel = this._buildPanel(d, d.dashboards[dashIdx], dashIdx, dashIdx === soonestIdx);
+    if (wasCollapsed !== null) {
+      const rl = newPanel.querySelector('.race-list');
+      if (rl) {
+        if (wasCollapsed) rl.classList.add('collapsed');
+        else rl.classList.remove('collapsed');
+        const chevron = rl.querySelector('.race-list-chevron');
+        if (chevron) chevron.textContent = wasCollapsed ? '▶' : '▼';
+      }
     }
-    const ms = State.effectiveStartMs(race);
-    const dt = new Date(ms);
-    const hh = String(dt.getHours()).padStart(2, '0');
-    const mm = String(dt.getMinutes()).padStart(2, '0');
-    el.textContent = `${hh}:${mm} Uhr`;
-    el.classList.remove('scheduled-time-tbd');
+    old.replaceWith(newPanel);
   },
 
-  renderCountdown(diffS) {
-    const el     = document.getElementById('dash-countdown');
-    const status = document.getElementById('dash-status-msg');
-    const race   = State.currentRace;
-    if (!race) return;
+  _buildPanel(d, dash, idx, isNext) {
+    const allDone  = dash.races.every(r => r.status === 'done');
+    const race     = dash.races[dash.currentRaceIndex];
+    const isFinale = race && race.type === 'Finale';
+
+    const panel = document.createElement('div');
+    panel.id        = `cp-${idx}`;
+    panel.className = `class-panel${isNext && !allDone ? ' is-next' : ''}${allDone ? ' is-done' : ''}`;
+
+    // ── Header
+    const hdr = document.createElement('div');
+    hdr.className = 'class-panel-header';
+    hdr.innerHTML = `
+      <div class="class-panel-info">
+        <span class="class-panel-name">${dash.driverClass}</span>
+        <span class="class-panel-group">${dash.driverGroup}</span>
+      </div>
+      <div class="cp-dots">${this._buildDots(dash)}</div>`;
+    panel.appendChild(hdr);
+
+    // ── Race card
+    const card = document.createElement('div');
+    card.className = `class-panel-race${isFinale ? ' finale' : ''}`;
+
+    let timeStr = 'Zeit TBD';
+    let timeTbd = true;
+    if (race && race.scheduledTimeISO) {
+      const ms = new Date(race.scheduledTimeISO).getTime()
+                 + (race.offsetMs || 0)
+                 + (dash.globalOffsetMs || 0);
+      const dt = new Date(ms);
+      timeStr  = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')} Uhr`;
+      timeTbd  = false;
+    }
+
+    card.innerHTML = `
+      <div class="cp-race-meta">
+        <span class="badge ${isFinale ? 'badge-final-type' : 'badge-vorlauf-type'}">${race ? race.type : '—'}</span>
+        <span class="cp-race-label">${race ? race.label : '—'}</span>
+        <span class="badge badge-gruppe">${race ? (race.group || dash.driverGroup) : '—'}</span>
+      </div>
+      <div class="cp-time-row">
+        <div class="cp-time-block">
+          <div class="cp-label">Startzeit</div>
+          <div class="cp-time-value${timeTbd ? ' scheduled-time-tbd' : ''}" id="cp-time-${idx}">${timeStr}</div>
+        </div>
+        <div class="cp-cd-block">
+          <div class="cp-label">Countdown</div>
+          <div class="countdown-value countdown-far" id="cp-cd-${idx}">--:--</div>
+        </div>
+      </div>
+      <div class="status-msg hidden" id="cp-status-${idx}"></div>`;
+    panel.appendChild(card);
+
+    // ── Adjust controls
+    const adj = document.createElement('div');
+    adj.className = 'cp-adjust';
+    const oMin = Math.round((dash.globalOffsetMs || 0) / 60000);
+    const oTxt = oMin === 0 ? 'Kein Versatz' : `${oMin > 0 ? '+' : ''}${oMin} Min`;
+    adj.innerHTML = `
+      <div class="cp-adjust-btns">
+        <button class="btn-adjust-panel" data-dash="${idx}" data-delta="-300">−5'</button>
+        <button class="btn-adjust-panel" data-dash="${idx}" data-delta="-60">−1'</button>
+        <button class="btn-adjust-panel" data-dash="${idx}" data-delta="60">+1'</button>
+        <button class="btn-adjust-panel" data-dash="${idx}" data-delta="300">+5'</button>
+      </div>
+      <div class="offset-display${oMin !== 0 ? ' nonzero' : ''}" id="cp-off-${idx}">${oTxt}</div>`;
+    panel.appendChild(adj);
+
+    // ── Race list (collapsed by default in multi-panel mode)
+    const isMulti = d.dashboards.length > 1;
+    const list = document.createElement('div');
+    list.className = `race-list${isMulti ? ' collapsed' : ''}`;
+    list.innerHTML = `<div class="race-list-header race-list-toggle">
+      <span>Alle Läufe</span>
+      <span class="race-list-chevron">${isMulti ? '▶' : '▼'}</span>
+    </div>`;
+    dash.races.forEach((r, i) => {
+      const isCur  = i === dash.currentRaceIndex;
+      const isDone = r.status === 'done';
+      const isFin  = r.type === 'Finale';
+      let ts = '--:--';
+      if (r.scheduledTimeISO) {
+        const ms = new Date(r.scheduledTimeISO).getTime() + (r.offsetMs || 0) + (dash.globalOffsetMs || 0);
+        const dt = new Date(ms);
+        ts = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+      }
+      let dotCls = isFin ? 'finale' : 'vorlauf';
+      if (isDone) dotCls += ' done';
+      if (isCur)  dotCls += ' current';
+      const row = document.createElement('div');
+      row.className = `race-list-row${isCur ? ' current' : ''}${isDone ? ' done' : ''}`;
+      row.innerHTML = `
+        <div class="race-list-dot ${dotCls}"></div>
+        <div class="race-list-label">${r.label}</div>
+        <div class="race-list-time">${ts}</div>
+        <div class="race-list-status">${isCur ? '▶' : isDone ? '✓' : ''}</div>`;
+      list.appendChild(row);
+    });
+    panel.appendChild(list);
+
+    return panel;
+  },
+
+  _buildDots(dash) {
+    return dash.races.map((r, i) => {
+      const pre = i === 3 ? '<span class="cp-dot-sep"></span>' : '';
+      let cls = `cp-dot ${i < 3 ? 'vl' : 'fi'}`;
+      if (r.status === 'done')              cls += ' done';
+      else if (i === dash.currentRaceIndex) cls += ' active';
+      return `${pre}<span class="${cls}" title="${r.label}"></span>`;
+    }).join('');
+  },
+
+  updatePanelCountdown(dashIdx, diffS, race) {
+    const el     = document.getElementById(`cp-cd-${dashIdx}`);
+    const status = document.getElementById(`cp-status-${dashIdx}`);
+    if (!el || !race) return;
 
     if (race.status === 'running') {
-      const elapsed = Math.abs(diffS);
-      const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-      const ss = String(elapsed % 60).padStart(2, '0');
-      el.textContent     = `${mm}:${ss}`;
-      el.className       = 'countdown-value countdown-running';
-      status.textContent = '🚦 Lauf läuft...';
-      status.className   = 'status-msg running';
-      status.classList.remove('hidden');
+      const e = Math.abs(diffS || 0);
+      el.textContent = `${String(Math.floor(e / 60)).padStart(2,'0')}:${String(e % 60).padStart(2,'0')}`;
+      el.className   = 'countdown-value countdown-running';
+      if (status) { status.textContent = '🚦 Lauf läuft…'; status.className = 'status-msg running'; status.classList.remove('hidden'); }
       return;
     }
 
     if (race.status === 'done') {
-      el.textContent     = '✓';
-      el.className       = 'countdown-value countdown-done';
-      status.textContent = '✓ Abgeschlossen';
-      status.className   = 'status-msg done';
-      status.classList.remove('hidden');
+      el.textContent = '✓';
+      el.className   = 'countdown-value countdown-done';
+      if (status) { status.textContent = '✓ Abgeschlossen'; status.className = 'status-msg done'; status.classList.remove('hidden'); }
       return;
     }
 
-    status.classList.add('hidden');
+    if (status) status.classList.add('hidden');
 
-    if (diffS <= 0) {
-      el.textContent = '00:00';
-      el.className   = 'countdown-value countdown-running';
-      return;
-    }
+    if (diffS == null) { el.textContent = '--:--'; el.className = 'countdown-value countdown-far'; return; }
+    if (diffS <= 0)    { el.textContent = '00:00'; el.className = 'countdown-value countdown-running'; return; }
 
-    const mm = String(Math.floor(diffS / 60)).padStart(2, '0');
-    const ss = String(diffS % 60).padStart(2, '0');
-    el.textContent = `${mm}:${ss}`;
-
+    el.textContent = `${String(Math.floor(diffS / 60)).padStart(2,'0')}:${String(diffS % 60).padStart(2,'0')}`;
     if      (diffS <= 300) el.className = 'countdown-value countdown-urgent';
     else if (diffS <= 900) el.className = 'countdown-value countdown-soon';
     else                   el.className = 'countdown-value countdown-far';
-  },
-
-  renderRaceList() {
-    const dash = State.activeDashboard;
-    if (!dash) return;
-    const list   = document.getElementById('race-list');
-    const header = list.querySelector('.race-list-header');
-    list.innerHTML = '';
-    list.appendChild(header);
-
-    dash.races.forEach((race, i) => {
-      const isCurrent = i === dash.currentRaceIndex;
-      const isDone    = race.status === 'done';
-      const isFinale  = race.type === 'Finale';
-
-      const row = document.createElement('div');
-      row.className = `race-list-row${isCurrent ? ' current' : ''}${isDone ? ' done' : ''}`;
-
-      let dotClass = isFinale ? 'finale' : 'vorlauf';
-      if (isDone)    dotClass += ' done';
-      if (isCurrent) dotClass += ' current';
-
-      let timeStr = '--:--';
-      if (race.scheduledTimeISO) {
-        const ms = State.effectiveStartMs(race);
-        const dt = new Date(ms);
-        timeStr  = `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
-      }
-
-      const statusStr = isCurrent ? '▶' : isDone ? '✓' : '';
-
-      row.innerHTML = `
-        <div class="race-list-dot ${dotClass}"></div>
-        <div class="race-list-label">${race.label}</div>
-        <div class="race-list-time">${timeStr}</div>
-        <div class="race-list-status">${statusStr}</div>
-      `;
-      list.appendChild(row);
-    });
-  },
-
-  renderOffsetDisplay() {
-    const dash = State.activeDashboard;
-    const el   = document.getElementById('offset-display');
-    if (!dash) return;
-    const offsetMin = Math.round((dash.globalOffsetMs || 0) / 60000);
-    if (offsetMin === 0) {
-      el.textContent = 'Kein Versatz aktiv';
-      el.classList.remove('nonzero');
-    } else {
-      const sign = offsetMin > 0 ? '+' : '';
-      el.textContent = `Aktueller Versatz: ${sign}${offsetMin} Min`;
-      el.classList.add('nonzero');
-    }
   }
 };
 
@@ -645,78 +653,72 @@ const CountdownController = {
   },
 
   _tick(nowS) {
-    if (!State.data) return;
-    const race = State.currentRace;
-    if (!race || !race.scheduledTimeISO) return;
-
-    const startMs = State.effectiveStartMs(race);
-    const diffS   = Math.floor((startMs - Date.now()) / 1000);
-
-    this._checkTransitions(diffS, race);
-    DashboardRenderer.renderCountdown(diffS);
+    if (!State.data || !State.data.dashboards) return;
+    State.data.dashboards.forEach((dash, i) => {
+      const race = dash.races[dash.currentRaceIndex];
+      if (!race || !race.scheduledTimeISO) {
+        DashboardRenderer.updatePanelCountdown(i, null, race);
+        return;
+      }
+      const startMs = new Date(race.scheduledTimeISO).getTime()
+                      + (race.offsetMs || 0)
+                      + (dash.globalOffsetMs || 0);
+      const diffS = Math.floor((startMs - Date.now()) / 1000);
+      this._checkTransitionsForDash(i, diffS, race, dash);
+      DashboardRenderer.updatePanelCountdown(i, diffS, race);
+    });
   },
 
-  _checkTransitions(diffS, race) {
-    const dash = State.activeDashboard;
-    if (!dash) return;
+  _checkTransitionsForDash(dashIdx, diffS, race, dash) {
     const idx = dash.currentRaceIndex;
 
     if (diffS <= 900 && diffS > 840 && race.status === 'pending') {
-      State.setRaceStatus(idx, 'warning_15');
+      dash.races[idx].status = 'warning_15';
+      State.save();
       SoundEngine.beep(15);
-      ModalController.show(15);
+      ModalController.show(15, dash.driverClass);
       return;
     }
 
     if (diffS <= 300 && diffS > 240 && race.status === 'warning_15') {
-      State.setRaceStatus(idx, 'warning_5');
+      dash.races[idx].status = 'warning_5';
+      State.save();
       SoundEngine.beep(5);
-      ModalController.show(5);
+      ModalController.show(5, dash.driverClass);
       return;
     }
 
     if (diffS <= 0 && (race.status === 'warning_5' || race.status === 'warning_15' || race.status === 'pending')) {
-      State.setRaceStatus(idx, 'running');
-      DashboardRenderer.renderProgressBar();
-      DashboardRenderer.renderRaceList();
+      dash.races[idx].status = 'running';
+      State.save();
+      DashboardRenderer.renderPanel(dashIdx);
       return;
     }
 
     if (diffS <= -300 && race.status === 'running') {
-      this._advanceRace();
+      this._advanceRaceInDash(dashIdx, dash);
     }
   },
 
-  _advanceRace() {
-    const dash        = State.activeDashboard;
-    const activeDashIdx = State.data.activeDashboardIndex;
-
-    State.setRaceStatus(dash.currentRaceIndex, 'done');
-
+  _advanceRaceInDash(dashIdx, dash) {
+    dash.races[dash.currentRaceIndex].status = 'done';
     const nextIndex = dash.currentRaceIndex + 1;
+
     if (nextIndex < dash.races.length) {
       dash.currentRaceIndex = nextIndex;
       State.save();
-      DashboardRenderer.renderAll();
+      DashboardRenderer.renderPanel(dashIdx);
       return;
     }
 
-    // This dashboard is complete — check all dashboards
+    State.save();
     const allDone = State.data.dashboards.every(d => d.races.every(r => r.status === 'done'));
     if (allDone) {
       App.showView('summary');
       SummaryRenderer.render();
-      return;
+    } else {
+      DashboardRenderer.renderPanel(dashIdx);
     }
-
-    // Other dashboards still running — auto-switch to first incomplete one
-    const nextDashIdx = State.data.dashboards.findIndex(
-      (d, i) => i !== activeDashIdx && !d.races.every(r => r.status === 'done')
-    );
-    if (nextDashIdx >= 0) {
-      State.setActiveDashboard(nextDashIdx);
-    }
-    DashboardRenderer.renderAll();
   }
 };
 
@@ -1185,16 +1187,30 @@ const App = {
       ModalController.confirm();
     });
 
-    document.querySelectorAll('.btn-adjust').forEach(btn => {
-      btn.addEventListener('click', () => {
-        SoundEngine.unlock();
-        const delta = parseInt(btn.dataset.delta, 10);
-        if (!delta || !State.data) return;
-        State.applyOffset(delta * 1000);
-        DashboardRenderer.renderScheduledTime();
-        DashboardRenderer.renderRaceList();
-        DashboardRenderer.renderOffsetDisplay();
-      });
+    document.addEventListener('click', e => {
+      const hdr = e.target.closest('.race-list-toggle');
+      if (hdr) {
+        const rl = hdr.closest('.race-list');
+        if (rl) {
+          const collapsed = rl.classList.toggle('collapsed');
+          const chevron = hdr.querySelector('.race-list-chevron');
+          if (chevron) chevron.textContent = collapsed ? '▶' : '▼';
+        }
+      }
+    });
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.btn-adjust-panel');
+      if (!btn || !State.data) return;
+      SoundEngine.unlock();
+      const dashIdx = parseInt(btn.dataset.dash, 10);
+      const delta   = parseInt(btn.dataset.delta, 10);
+      if (!delta || isNaN(dashIdx)) return;
+      const dash = State.data.dashboards[dashIdx];
+      if (!dash) return;
+      dash.globalOffsetMs = (dash.globalOffsetMs || 0) + (delta * 1000);
+      State.save();
+      DashboardRenderer.renderPanel(dashIdx);
     });
 
     document.getElementById('btn-nav-settings').addEventListener('click', () => {
