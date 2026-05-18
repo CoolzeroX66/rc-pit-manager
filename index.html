@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#010409">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>RC Pit Manager – Godzilla Racing 66</title>
@@ -82,6 +83,10 @@
         </div>
       </div>
 
+      <button class="btn btn-primary btn-full mt-2 hidden" id="btn-weiter-fahrer">
+        &#9654; Weiter zur Fahrerwahl
+      </button>
+
       <div class="demo-divider">oder</div>
 
       <button class="btn btn-secondary btn-full mb-2" id="btn-demo">
@@ -134,6 +139,9 @@
       <span class="badge badge-gruppe" id="dash-badge-gruppe">—</span>
     </div>
   </div>
+
+  <!-- Class tabs (hidden when only one class) -->
+  <div class="class-tabs hidden" id="class-tabs" role="tablist" aria-label="Klassen-Auswahl"></div>
 
   <!-- Progress bar: 6 race dots -->
   <div class="race-progress" id="race-progress" aria-label="Rennen-Fortschritt">
