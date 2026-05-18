@@ -593,7 +593,15 @@ a { color: var(--accent); text-decoration: none; }
   padding: 0.5rem 0.85rem;
   background: rgba(255,255,255,0.02);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+.race-list-toggle { cursor: pointer; user-select: none; }
+.race-list-toggle:active { background: rgba(255,255,255,0.05); }
+.race-list-chevron { font-size: 0.6rem; opacity: 0.7; }
+.race-list.collapsed .race-list-row { display: none; }
+.race-list.collapsed { margin-bottom: 0; border-bottom: none; }
 
 .race-list-row {
   display: flex;
@@ -794,11 +802,219 @@ a { color: var(--accent); text-decoration: none; }
 .text-center  { text-align: center; }
 .text-sm      { font-size: 0.85rem; }
 
-/* ── 17. Responsive ────────────────────────────────────────────────────────── */
+/* ── 17. Class Tabs ────────────────────────────────────────────────────────── */
+.class-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--bg-nav);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 48px;
+  z-index: 10;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.class-tab {
+  flex: 1;
+  min-height: 44px;
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.class-tab:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.class-tab.active {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.class-tab.done {
+  opacity: 0.6;
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.class-tab.done.active {
+  background: rgba(34, 197, 94, 0.1);
+  opacity: 1;
+}
+
+/* ── 18. Class Panels ──────────────────────────────────────────────────────── */
+.class-panels { padding-bottom: 2rem; }
+
+.class-panel {
+  border-left: 4px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: border-left-color 0.3s ease;
+}
+.class-panels.multi .class-panel + .class-panel { margin-top: 0.5rem; border-top: 2px solid var(--border); }
+
+.class-panel.is-next { border-left-color: var(--accent); }
+.class-panel.is-done { border-left-color: var(--success); opacity: 0.75; }
+
+/* Panel header */
+.class-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem 0.5rem;
+  background: var(--bg-nav);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 48px;
+  z-index: 8;
+}
+
+.class-panel-info { display: flex; flex-direction: column; gap: 0.1rem; }
+
+.class-panel-name {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.class-panel-group { font-size: 0.72rem; color: var(--muted); }
+
+/* Progress dots in header */
+.cp-dots { display: flex; align-items: center; gap: 5px; }
+.cp-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--border);
+  display: inline-block;
+}
+.cp-dot.vl         { border: 2px solid var(--vorlauf); }
+.cp-dot.fi         { border: 2px solid var(--final); }
+.cp-dot.done       { background: var(--success); border-color: var(--success); }
+.cp-dot.active     { background: var(--accent);  border-color: var(--accent); }
+.cp-dot-sep        { display: inline-block; width: 6px; height: 2px; background: var(--border); border-radius: 1px; }
+
+/* Race card inside panel */
+.class-panel-race {
+  background: var(--bg-card);
+  padding: 0.9rem 1rem 0.75rem;
+  border-left: 3px solid var(--vorlauf);
+}
+.class-panel-race.finale { border-left-color: var(--final); }
+
+.cp-race-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cp-race-label {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+
+/* Time + Countdown side by side */
+.cp-time-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.cp-time-block, .cp-cd-block { flex: 1; }
+
+.cp-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.cp-time-value {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  font-size: clamp(1.6rem, 6vw, 2.2rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.cp-time-value.scheduled-time-tbd { color: var(--muted); font-size: 1rem; }
+
+/* Countdown reuse existing .countdown-value but smaller in panels */
+.class-panel-race .countdown-value {
+  font-size: clamp(1.9rem, 8vw, 2.8rem);
+  line-height: 1;
+}
+
+/* Adjust controls */
+.cp-adjust {
+  padding: 0.6rem 1rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cp-adjust-btns { display: flex; gap: 0.35rem; }
+
+.btn-adjust-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  min-height: 36px;
+  min-width: 40px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-adjust-panel:hover { border-color: var(--accent); background: rgba(249,115,22,0.1); }
+.btn-adjust-panel:active { background: rgba(249,115,22,0.2); }
+
+.cp-adjust .offset-display {
+  font-size: 0.75rem;
+  color: var(--muted);
+  flex: 1;
+  text-align: right;
+}
+.cp-adjust .offset-display.nonzero { color: var(--warn-5); }
+
+/* ── 19. Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 380px) {
   .adjust-buttons { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
   .scheduled-time-value { font-size: 2.2rem; }
   .countdown-value { font-size: clamp(3.5rem, 16vw, 6rem); }
+}
+
+@media (max-width: 380px) {
+  .class-panel-race .countdown-value { font-size: clamp(1.8rem, 8vw, 2.6rem); }
+  .cp-time-value { font-size: clamp(1.3rem, 5vw, 1.8rem); }
+  .cp-adjust-btns { gap: 0.2rem; }
+  .btn-adjust-panel { padding: 0.25rem 0.4rem; min-width: 34px; font-size: 0.75rem; }
 }
 
 @media (min-width: 481px) {
@@ -808,7 +1024,7 @@ a { color: var(--accent); text-decoration: none; }
   .race-list { margin: 0 1.5rem 1.5rem; }
 }
 
-/* ── 18. Scrollbar (webkit) ────────────────────────────────────────────────── */
+/* ── 20. Scrollbar (webkit) ────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
