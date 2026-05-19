@@ -954,14 +954,6 @@ a { color: var(--accent); text-decoration: none; }
   white-space: normal;
 }
 
-.lt-drv-spark {
-  display: flex;
-  justify-content: center;
-  margin-top: 0.15rem;
-}
-
-.lt-spark { display: block; }
-
 .lt-time {
   font-family: 'Oswald', 'Arial Narrow', sans-serif;
   font-size: 0.88rem;
@@ -1052,6 +1044,37 @@ a { color: var(--accent); text-decoration: none; }
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ── Combined lap-time chart ───────────────────────────────────────────────── */
+.combined-chart-wrap {
+  background: rgba(8,9,14,0.6);
+  border-bottom: 1px solid var(--border);
+}
+
+.combined-chart-svg {
+  display: block;
+  width: 100%;
+}
+
+.combined-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  padding: 0.55rem 0.9rem 0.6rem;
+  background: rgba(13,17,24,0.7);
+  border-top: 1px solid var(--border);
+}
+
+.ccl-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 0.78rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.ccl-name { font-weight: 500; }
 
 /* ── Driver selection cards ────────────────────────────────────────────────── */
 .driver-select-hint {

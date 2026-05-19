@@ -1347,6 +1347,10 @@ const AnalyseController = {
     const drivers = r.drivers.filter((_, i) => this._selected.has(i));
     if (!drivers.length) { this._showSelect(); return; }
 
+    // Assign a distinct color per driver
+    const PALETTE = ['#ff6b00','#3b82f6','#22c55e','#facc15','#ec4899','#06b6d4','#a855f7','#f87171'];
+    drivers.forEach((d, i) => { d._color = PALETTE[i % PALETTE.length]; });
+
     const maxLaps = Math.max(...drivers.map(d => d.lapTimes.length), 0);
 
     // Overall fastest (skip lap 0 = standing start)
@@ -1354,12 +1358,12 @@ const AnalyseController = {
     drivers.forEach(d => d.lapTimes.slice(1).forEach(t => { if (t < globalBest) globalBest = t; }));
     drivers.forEach(d => { d.pb = d.lapTimes.slice(1).length ? Math.min(...d.lapTimes.slice(1)) : Infinity; });
 
+    // Table header — colored top border per driver, no sparkline
     let thead = '<tr><th class="lt-sticky lt-col-lap">#</th>';
     drivers.forEach(d => {
-      thead += `<th class="lt-col-driver">
+      thead += `<th class="lt-col-driver" style="border-top:3px solid ${d._color}">
         <div class="lt-drv-pos">P${d.pos} <span style="color:var(--muted);font-weight:400">#${d.nr}</span></div>
         <div class="lt-drv-name">${d.name}</div>
-        <div class="lt-drv-spark">${this._spark(d.lapTimes)}</div>
       </th>`;
     });
     thead += '</tr>';
@@ -1395,6 +1399,7 @@ const AnalyseController = {
         <button class="btn-back-small" id="btn-cmp-back">&#9664; Fahrerwahl</button>
         <span class="compare-title">${r.raceName}</span>
       </div>
+      ${this._combinedChart(drivers)}
       <div class="lap-table-wrap">
         <table class="lap-table">
           <thead>${thead}</thead>
@@ -1409,6 +1414,72 @@ const AnalyseController = {
     `;
 
     document.getElementById('btn-cmp-back').addEventListener('click', () => this._showSelect());
+  },
+
+  _combinedChart(drivers) {
+    const W = 800, H = 140, pX = 10, pY = 12;
+
+    // Skip standing-start lap (index 0)
+    const allTimes = drivers.flatMap(d => d.lapTimes.slice(1));
+    if (allTimes.length < 2) return '';
+
+    const mn      = Math.min(...allTimes);
+    const rawMx   = Math.max(...allTimes);
+    // Cap outliers so normal laps fill ~85% of chart height
+    const mx      = Math.min(rawMx, mn * 1.25);
+    const rng     = mx - mn || 0.001;
+    const lapCnt  = Math.max(...drivers.map(d => d.lapTimes.length - 1));
+    if (lapCnt < 2) return '';
+
+    // Subtle horizontal grid lines
+    const gridInterval = rng > 2 ? 1.0 : rng > 0.8 ? 0.5 : 0.2;
+    let grid = '';
+    const firstGrid = Math.ceil(mn / gridInterval) * gridInterval;
+    for (let v = firstGrid; v <= mx + 0.001; v += gridInterval) {
+      const y = (H - pY - ((v - mn) / rng) * (H - pY * 2)).toFixed(1);
+      grid += `<line x1="${pX}" y1="${y}" x2="${W - pX}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+    }
+
+    // One polyline per driver — fast laps = low on chart, slow = high
+    let lines = '';
+    drivers.forEach(d => {
+      const laps = d.lapTimes.slice(1);
+      if (laps.length < 2) return;
+      const pts = laps.map((t, i) => {
+        const x  = (pX + (i / (lapCnt - 1)) * (W - pX * 2)).toFixed(1);
+        const tc = Math.min(t, mx); // clamp outlier to top of visible range
+        const y  = (H - pY - ((tc - mn) / rng) * (H - pY * 2)).toFixed(1);
+        return `${x},${y}`;
+      }).join(' ');
+      lines += `<polyline points="${pts}" fill="none" stroke="${d._color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>`;
+      // Mark personal best lap with a small dot
+      const pbIdx = laps.indexOf(Math.min(...laps));
+      if (pbIdx >= 0) {
+        const bx = (pX + (pbIdx / (lapCnt - 1)) * (W - pX * 2)).toFixed(1);
+        const bt = Math.min(laps[pbIdx], mx);
+        const by = (H - pY - ((bt - mn) / rng) * (H - pY * 2)).toFixed(1);
+        lines += `<circle cx="${bx}" cy="${by}" r="4" fill="${d._color}" opacity="0.95"/>`;
+      }
+    });
+
+    // Legend as HTML below the SVG
+    const legend = drivers.map(d =>
+      `<span class="ccl-item">
+        <svg width="22" height="4" viewBox="0 0 22 4" style="display:inline-block;vertical-align:middle;margin-right:5px">
+          <line x1="0" y1="2" x2="22" y2="2" stroke="${d._color}" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <span class="ccl-name">P${d.pos} ${d.name}</span>
+      </span>`
+    ).join('');
+
+    return `
+      <div class="combined-chart-wrap">
+        <svg class="combined-chart-svg" viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none">
+          <rect width="${W}" height="${H}" fill="rgba(8,9,14,0.6)"/>
+          ${grid}${lines}
+        </svg>
+        <div class="combined-chart-legend">${legend}</div>
+      </div>`;
   },
 
   // ── File loading ───────────────────────────────────────────────────────────
@@ -1444,18 +1515,6 @@ const AnalyseController = {
     });
   },
 
-  _spark(times) {
-    const vals = times.slice(1);
-    if (vals.length < 3) return '';
-    const w = 64, h = 20, p = 2;
-    const mn = Math.min(...vals), mx = Math.max(...vals), rng = mx - mn || 0.001;
-    const pts = vals.map((t, i) => {
-      const x = (p + (i / (vals.length - 1)) * (w - p * 2)).toFixed(1);
-      const y = (h - p - ((t - mn) / rng) * (h - p * 2)).toFixed(1);
-      return `${x},${y}`;
-    }).join(' ');
-    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="lt-spark"><polyline points="${pts}" fill="none" stroke="rgba(255,107,0,0.55)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
-  }
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
