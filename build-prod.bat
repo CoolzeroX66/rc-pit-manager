@@ -17,9 +17,13 @@ echo  [..] Erstelle dist\...
 mkdir %DIST%
 
 echo  [..] Kopiere Dateien...
-copy index.html  %DIST%\index.html  >nul
-copy style.css   %DIST%\style.css   >nul
-copy app.js      %DIST%\app.js      >nul
+copy index.html    %DIST%\index.html    >nul
+copy style.css     %DIST%\style.css     >nul
+copy app.js        %DIST%\app.js        >nul
+copy manifest.json %DIST%\manifest.json >nul
+copy sw.js         %DIST%\sw.js         >nul
+copy icon-192.png  %DIST%\icon-192.png  >nul
+copy icon-512.png  %DIST%\icon-512.png  >nul
 
 echo.
 echo  [OK] Produktion Build erstellt in: %DIST%\
