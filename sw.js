@@ -1,4 +1,4 @@
-const CACHE = 'rcpit-v2';
+const CACHE = 'rcpit-v3';
 const ASSETS = [
   './',
   './index.html',
