@@ -1114,11 +1114,12 @@ const SetupController = {
    ANALYSE PARSER
    ════════════════════════════════════════════════════════════════════════════ */
 const AnalyseParser = {
+  STORE_KEY: 'gr66_analyse',
+
   async parse(file) {
     const pageTexts = await PDFParser.extractText(file);
     if (!pageTexts) throw new Error('PDF konnte nicht gelesen werden (pdf.js nicht verfügbar?)');
-    const text = pageTexts.join('\n');
-    return this._parseText(text);
+    return this._parseText(pageTexts.join('\n'));
   },
 
   _parseText(raw) {
@@ -1129,22 +1130,28 @@ const AnalyseParser = {
     drivers.forEach((d, i) => {
       d.lapTimes = lapRows.map(row => (i < row.length ? row[i] : null)).filter(t => t !== null);
     });
-    return { drivers, raceName: this._raceName(text) };
+    return { drivers, ...this._parseMeta(text) };
   },
 
-  _raceName(text) {
-    const m = text.match(/((?:[A-Z]-)?Finale[^\n|]{0,40}|Vorlauf\s*\d+)/i);
-    return m ? m[1].trim() : 'Rennen';
+  _parseMeta(text) {
+    const nameM = text.match(/((?:[A-Z]-)?Finale[^\n|]{0,60}|Vorlauf\s*\d+[^\n]{0,40})/i);
+    const dateM = text.match(/Datum:\s*(\d{2}\.\d{2}\.\d{4})/i);
+    const trackM = text.match(/Strecke:\s*([^\n]+)/i);
+    return {
+      raceName: nameM ? nameM[1].trim().replace(/\s+/g, ' ') : 'Rennen',
+      raceDate: dateM ? dateM[1] : null,
+      track:    trackM ? trackM[1].split('|')[0].trim() : null
+    };
   },
 
   _parseDrivers(text) {
     const list = [];
-    // Columns: Pos Nr Name(lazy) Rundenzeit Rnd Absolutzeit Bestzeit Mediumzeit StDev
-    const re = /^\s*(\d{1,2})\s+(\d{1,3})\s+(.+?)\s+(\d+\.\d{3})\s+(\d+)\s+(\d+:[\d.]+)\s+(\d+\.\d{3})\s+(\d+\.\d{3})\s+(\d+\.\d{3})/gm;
+    // Columns: Pos Nr Name(lazy, stops at first decimal) [optional I] Rundenzeit Rnd Absolutzeit Bestzeit Mediumzeit StDev
+    const re = /^\s*(\d{1,2})\s+(\d{1,3})\s+(.+?)\s+(?:I\s+)?(\d+\.\d{3})\s+(\d+)\s+(\d+:[\d.]+)\s+(\d+\.\d{3})\s+(\d+\.\d{3})\s+(\d+\.\d{3})/gm;
     let m;
     while ((m = re.exec(text)) !== null) {
-      const name = m[3].trim();
-      if (!name || /^[\d]/.test(name)) continue;
+      const name = m[3].trim().replace(/\s+I\s*$/, '');
+      if (!name || /^\d/.test(name)) continue;
       list.push({
         pos:      +m[1],
         nr:       m[2],
@@ -1163,92 +1170,200 @@ const AnalyseParser = {
     const idx = text.search(/Rundenzeiten/i);
     if (idx < 0) return [];
     const rows = [];
-    const section = text.slice(idx + 12);
-    for (const line of section.split('\n')) {
+    for (const line of text.slice(idx + 12).split('\n')) {
       const t = line.trim();
       if (!t) continue;
-      if (/^[A-Za-zÄÖÜäöü]/.test(t)) break;
+      // Stop at next real section header (not at driver name lines in the table header)
+      if (/^(Rekorde|Klasse\s|PW Cup Lauf|Ausrichter|Datum:|Strecke:)/i.test(t)) break;
+      // Only process lines starting with a digit (= lap number rows)
+      if (!/^\d/.test(t)) continue;
       const parts = t.split(/\s+/);
-      if (isNaN(parseInt(parts[0], 10))) continue;
+      const lapNum = parseInt(parts[0], 10);
+      if (isNaN(lapNum) || lapNum < 1) continue;
       const times = parts.slice(1).map(Number).filter(x => !isNaN(x) && x > 0);
       if (times.length) rows.push(times);
     }
     return rows;
-  }
+  },
+
+  save(result) {
+    try {
+      localStorage.setItem(this.STORE_KEY, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), ...result }));
+    } catch (_) {}
+  },
+
+  load() {
+    try {
+      const raw = localStorage.getItem(this.STORE_KEY);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      return d.version === 1 ? d : null;
+    } catch (_) { return null; }
+  },
+
+  clear() { localStorage.removeItem(this.STORE_KEY); }
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
    ANALYSE CONTROLLER
    ════════════════════════════════════════════════════════════════════════════ */
 const AnalyseController = {
+  _result:   null,
+  _selected: new Set(),
+
   init() {
+    const saved = AnalyseParser.load();
+    if (saved) {
+      this._result = saved;
+      this._selected = new Set();
+      this._showSelect();
+    } else {
+      this._showUpload();
+    }
+  },
+
+  // ── Section switching ──────────────────────────────────────────────────────
+  _showUpload() {
+    document.getElementById('analyse-upload-wrap').classList.remove('hidden');
+    document.getElementById('analyse-select-section').classList.add('hidden');
+    document.getElementById('analyse-compare-section').classList.add('hidden');
     const inp = document.getElementById('input-analyse');
     inp.value = '';
     document.getElementById('fname-analyse').textContent = 'PDF-Datei auswählen…';
+    document.getElementById('fname-analyse').classList.remove('selected');
     const st = document.getElementById('status-analyse');
     st.className = 'parse-status';
     st.textContent = '';
-    document.getElementById('analyse-result').classList.add('hidden');
-    document.getElementById('analyse-upload-wrap').classList.remove('hidden');
     inp.onchange = e => { if (e.target.files[0]) this._load(e.target.files[0]); };
     this._bindDrop('drop-analyse', f => this._load(f));
   },
 
-  _bindDrop(id, cb) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-    el.addEventListener('drop', e => {
-      e.preventDefault();
-      el.classList.remove('drag-over');
-      const f = e.dataTransfer.files[0];
-      if (f) cb(f);
-    });
+  _showSelect() {
+    document.getElementById('analyse-upload-wrap').classList.add('hidden');
+    document.getElementById('analyse-select-section').classList.remove('hidden');
+    document.getElementById('analyse-compare-section').classList.add('hidden');
+    this._renderSelectUI();
   },
 
-  async _load(file) {
-    const st = document.getElementById('status-analyse');
-    document.getElementById('fname-analyse').textContent = file.name;
-    document.getElementById('fname-analyse').classList.add('selected');
-    st.className = 'parse-status loading';
-    st.innerHTML = '<span class="spinner"></span> Analysiere…';
-    try {
-      const result = await AnalyseParser.parse(file);
-      const maxLaps = Math.max(...result.drivers.map(d => d.lapTimes.length), 0);
-      st.className = 'parse-status ok';
-      st.textContent = `✓ ${result.drivers.length} Fahrer · ${maxLaps} Runden`;
-      this._renderResult(result);
-    } catch (err) {
-      st.className = 'parse-status error';
-      st.textContent = `✕ ${err.message}`;
+  _showCompare() {
+    document.getElementById('analyse-upload-wrap').classList.add('hidden');
+    document.getElementById('analyse-select-section').classList.add('hidden');
+    document.getElementById('analyse-compare-section').classList.remove('hidden');
+    this._renderCompare();
+  },
+
+  // ── Driver selection UI ────────────────────────────────────────────────────
+  _renderSelectUI() {
+    const r   = this._result;
+    const maxLaps = Math.max(...r.drivers.map(d => d.lapTimes.length), 0);
+
+    let cards = '<div class="driver-cards">';
+    r.drivers.forEach((d, i) => {
+      const sel = this._selected.has(i);
+      cards += `<div class="driver-card${sel ? ' selected' : ''}" data-idx="${i}">
+        <div class="dc-badge">P${d.pos} <span class="dc-nr">#${d.nr}</span></div>
+        <div class="dc-name">${d.name}</div>
+        <div class="dc-stats">
+          <span class="dc-best">${d.bestTime.toFixed(3)}</span>
+          <span class="dc-laps">${d.laps} Rnd</span>
+        </div>
+      </div>`;
+    });
+    cards += '</div>';
+
+    const sec = document.getElementById('analyse-select-section');
+    sec.innerHTML = `
+      <div class="analyse-meta">
+        <div class="am-item"><span class="am-label">Rennen</span><span class="am-value">${r.raceName}</span></div>
+        ${r.raceDate ? `<div class="am-item"><span class="am-label">Datum</span><span class="am-value">${r.raceDate}</span></div>` : ''}
+        ${r.track ? `<div class="am-item"><span class="am-label">Strecke</span><span class="am-value">${r.track}</span></div>` : ''}
+        <div class="am-item"><span class="am-label">Fahrer</span><span class="am-value">${r.drivers.length}</span></div>
+        <div class="am-item"><span class="am-label">Runden</span><span class="am-value">${maxLaps}</span></div>
+      </div>
+      <div class="driver-select-hint">Fahrer antippen zum Auswählen:</div>
+      ${cards}
+      <div class="analyse-actions">
+        <button class="btn btn-secondary" id="btn-sel-all">Alle</button>
+        <button class="btn btn-primary" id="btn-sel-compare" disabled>Vergleich starten</button>
+      </div>
+      <div class="container mb-2">
+        <button class="btn btn-secondary btn-full" id="btn-sel-newfile" style="min-height:38px;font-size:0.8rem;">
+          &#128196; Neue Datei laden
+        </button>
+      </div>
+    `;
+
+    sec.querySelectorAll('.driver-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const i = +card.dataset.idx;
+        this._selected.has(i) ? this._selected.delete(i) : this._selected.add(i);
+        this._syncCards();
+      });
+    });
+
+    document.getElementById('btn-sel-all').addEventListener('click', () => {
+      if (this._selected.size === r.drivers.length) this._selected.clear();
+      else r.drivers.forEach((_, i) => this._selected.add(i));
+      this._syncCards();
+    });
+
+    document.getElementById('btn-sel-compare').addEventListener('click', () => {
+      if (this._selected.size) this._showCompare();
+    });
+
+    document.getElementById('btn-sel-newfile').addEventListener('click', () => {
+      AnalyseParser.clear();
+      this._result = null;
+      this._selected = new Set();
+      this._showUpload();
+    });
+
+    this._syncCards();
+  },
+
+  _syncCards() {
+    const sec = document.getElementById('analyse-select-section');
+    if (!sec) return;
+    sec.querySelectorAll('.driver-card').forEach(card => {
+      card.classList.toggle('selected', this._selected.has(+card.dataset.idx));
+    });
+    const btnCmp = document.getElementById('btn-sel-compare');
+    const btnAll = document.getElementById('btn-sel-all');
+    if (btnCmp) {
+      btnCmp.disabled = this._selected.size === 0;
+      btnCmp.textContent = this._selected.size
+        ? `Vergleich starten (${this._selected.size})`
+        : 'Vergleich starten';
+    }
+    if (btnAll) {
+      btnAll.textContent = this._selected.size === this._result.drivers.length
+        ? 'Alle ab' : 'Alle';
     }
   },
 
-  _renderResult(result) {
-    const { drivers, raceName } = result;
+  // ── Comparison table ───────────────────────────────────────────────────────
+  _renderCompare() {
+    const r = this._result;
+    const drivers = r.drivers.filter((_, i) => this._selected.has(i));
+    if (!drivers.length) { this._showSelect(); return; }
+
     const maxLaps = Math.max(...drivers.map(d => d.lapTimes.length), 0);
 
-    // Overall fastest lap across all drivers (skip lap index 0 = standing start)
+    // Overall fastest (skip lap 0 = standing start)
     let globalBest = Infinity;
     drivers.forEach(d => d.lapTimes.slice(1).forEach(t => { if (t < globalBest) globalBest = t; }));
-
-    // Personal best per driver from actual lap times
     drivers.forEach(d => { d.pb = d.lapTimes.slice(1).length ? Math.min(...d.lapTimes.slice(1)) : Infinity; });
 
-    // Header row
     let thead = '<tr><th class="lt-sticky lt-col-lap">#</th>';
     drivers.forEach(d => {
       thead += `<th class="lt-col-driver">
-        <div class="lt-drv-pos">P${d.pos}</div>
-        <div class="lt-drv-nr">#${d.nr}</div>
+        <div class="lt-drv-pos">P${d.pos} <span style="color:var(--muted);font-weight:400">#${d.nr}</span></div>
         <div class="lt-drv-name">${d.name}</div>
         <div class="lt-drv-spark">${this._spark(d.lapTimes)}</div>
       </th>`;
     });
     thead += '</tr>';
 
-    // Data rows
     let tbody = '';
     for (let i = 0; i < maxLaps; i++) {
       tbody += `<tr><td class="lt-sticky lt-lap-num">${i + 1}</td>`;
@@ -1256,16 +1371,15 @@ const AnalyseController = {
         const t = d.lapTimes[i];
         if (t == null) { tbody += '<td class="lt-time lt-empty">—</td>'; return; }
         let cls = 'lt-time';
-        if (i === 0)           cls += ' lt-start';
+        if      (i === 0)          cls += ' lt-start';
         else if (t === globalBest) cls += ' lt-fastest';
-        else if (t === d.pb)   cls += ' lt-pb';
-        else if (t > d.pb * 1.08) cls += ' lt-slow';
+        else if (t === d.pb)       cls += ' lt-pb';
+        else if (t > d.pb * 1.08)  cls += ' lt-slow';
         tbody += `<td class="${cls}">${t.toFixed(3)}</td>`;
       });
       tbody += '</tr>';
     }
 
-    // Summary row
     tbody += '<tr class="lt-sum-row"><td class="lt-sticky lt-lap-num">Ø</td>';
     drivers.forEach(d => {
       tbody += `<td class="lt-summary">
@@ -1275,12 +1389,11 @@ const AnalyseController = {
     });
     tbody += '</tr>';
 
-    const resultEl = document.getElementById('analyse-result');
-    resultEl.innerHTML = `
-      <div class="analyse-meta">
-        <div class="am-item"><span class="am-label">Rennen</span><span class="am-value">${raceName}</span></div>
-        <div class="am-item"><span class="am-label">Fahrer</span><span class="am-value">${drivers.length}</span></div>
-        <div class="am-item"><span class="am-label">Runden</span><span class="am-value">${maxLaps}</span></div>
+    const sec = document.getElementById('analyse-compare-section');
+    sec.innerHTML = `
+      <div class="compare-back-bar">
+        <button class="btn-back-small" id="btn-cmp-back">&#9664; Fahrerwahl</button>
+        <span class="compare-title">${r.raceName}</span>
       </div>
       <div class="lap-table-wrap">
         <table class="lap-table">
@@ -1293,24 +1406,49 @@ const AnalyseController = {
         <span class="lt-legend-item"><span class="lt-legend-dot lt-pb"></span>Pers. Bestzeit</span>
         <span class="lt-legend-item"><span class="lt-legend-dot lt-slow"></span>&gt;8% über Bestzeit</span>
       </div>
-      <div class="container mb-2 mt-1">
-        <button class="btn btn-secondary btn-full" id="btn-analyse-new" style="min-height:40px;font-size:0.82rem;">
-          &#128202; Andere Datei laden
-        </button>
-      </div>
     `;
-    resultEl.classList.remove('hidden');
-    document.getElementById('analyse-upload-wrap').classList.add('hidden');
 
-    document.getElementById('btn-analyse-new').addEventListener('click', () => this.init());
+    document.getElementById('btn-cmp-back').addEventListener('click', () => this._showSelect());
+  },
+
+  // ── File loading ───────────────────────────────────────────────────────────
+  async _load(file) {
+    const st = document.getElementById('status-analyse');
+    document.getElementById('fname-analyse').textContent = file.name;
+    document.getElementById('fname-analyse').classList.add('selected');
+    st.className = 'parse-status loading';
+    st.innerHTML = '<span class="spinner"></span> Analysiere…';
+    try {
+      const result = await AnalyseParser.parse(file);
+      AnalyseParser.save(result);
+      this._result = result;
+      this._selected = new Set();
+      const maxLaps = Math.max(...result.drivers.map(d => d.lapTimes.length), 0);
+      st.className = 'parse-status ok';
+      st.textContent = `✓ ${result.drivers.length} Fahrer · ${maxLaps} Runden`;
+      setTimeout(() => this._showSelect(), 500);
+    } catch (err) {
+      st.className = 'parse-status error';
+      st.textContent = `✕ ${err.message}`;
+    }
+  },
+
+  _bindDrop(id, cb) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+      e.preventDefault(); el.classList.remove('drag-over');
+      const f = e.dataTransfer.files[0]; if (f) cb(f);
+    });
   },
 
   _spark(times) {
     const vals = times.slice(1);
     if (vals.length < 3) return '';
     const w = 64, h = 20, p = 2;
-    const mn = Math.min(...vals), mx = Math.max(...vals);
-    const rng = mx - mn || 0.001;
+    const mn = Math.min(...vals), mx = Math.max(...vals), rng = mx - mn || 0.001;
     const pts = vals.map((t, i) => {
       const x = (p + (i / (vals.length - 1)) * (w - p * 2)).toFixed(1);
       const y = (h - p - ((t - mn) / rng) * (h - p * 2)).toFixed(1);

@@ -167,15 +167,15 @@
 
 <!-- ════════════════════════════════════════════════ ANALYSE VIEW ═══ -->
 <section id="view-analyse" class="view">
-  <div class="container">
 
+  <!-- State 1: Upload -->
+  <div id="analyse-upload-wrap" class="container">
     <div class="analyse-header">
       <div style="font-size:2rem;margin-bottom:0.4rem;">&#128202;</div>
       <div class="analyse-title">Rennanalyse</div>
       <div class="text-muted text-sm mt-1">RCM Ergebnisliste importieren &amp; auswerten</div>
     </div>
-
-    <div id="analyse-upload-wrap" class="setup-card">
+    <div class="setup-card">
       <div class="setup-card-title">
         <span class="setup-step-badge">PDF</span>
         Ergebnisliste importieren
@@ -194,12 +194,14 @@
         &#8592; Zurück
       </button>
     </div>
+  </div>
 
-    <div id="analyse-result" class="hidden">
-      <!-- injected by JS -->
-    </div>
+  <!-- State 2: Driver selection (injected by JS) -->
+  <div id="analyse-select-section" class="hidden"></div>
 
-  </div><!-- /container -->
+  <!-- State 3: Comparison table (injected by JS) -->
+  <div id="analyse-compare-section" class="hidden"></div>
+
 </section>
 
 <!-- ═══════════════════════════════════════════════════════ MODAL ═══ -->
