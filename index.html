@@ -22,6 +22,7 @@
 <nav class="nav" id="nav">
   <span class="title-brand">&#127950; RC PIT &middot; GR66</span>
   <div class="nav-actions">
+    <button class="btn-nav" id="btn-nav-analyse" title="Rennanalyse">&#128202; Analyse</button>
     <button class="btn-nav" id="btn-nav-settings" title="Einstellungen">&#9881; Setup</button>
     <button class="btn-nav hidden" id="btn-nav-reset" title="Zurücksetzen">&#10006; Reset</button>
   </div>
@@ -162,6 +163,43 @@
       </button>
     </div>
   </div>
+</section>
+
+<!-- ════════════════════════════════════════════════ ANALYSE VIEW ═══ -->
+<section id="view-analyse" class="view">
+  <div class="container">
+
+    <div class="analyse-header">
+      <div style="font-size:2rem;margin-bottom:0.4rem;">&#128202;</div>
+      <div class="analyse-title">Rennanalyse</div>
+      <div class="text-muted text-sm mt-1">RCM Ergebnisliste importieren &amp; auswerten</div>
+    </div>
+
+    <div id="analyse-upload-wrap" class="setup-card">
+      <div class="setup-card-title">
+        <span class="setup-step-badge">PDF</span>
+        Ergebnisliste importieren
+      </div>
+      <label class="file-upload-label">RCM Ergebnisdatei (.pdf)</label>
+      <div class="file-input-wrapper">
+        <div class="file-input-custom" id="drop-analyse">
+          <input type="file" id="input-analyse" accept=".pdf" aria-label="Analyse PDF">
+          <span class="file-icon">&#128196;</span>
+          <span class="file-name" id="fname-analyse">PDF-Datei auswählen…</span>
+        </div>
+      </div>
+      <div class="parse-status" id="status-analyse"></div>
+      <button class="btn btn-secondary btn-full mt-2" id="btn-analyse-back"
+              style="min-height:40px;font-size:0.82rem;">
+        &#8592; Zurück
+      </button>
+    </div>
+
+    <div id="analyse-result" class="hidden">
+      <!-- injected by JS -->
+    </div>
+
+  </div><!-- /container -->
 </section>
 
 <!-- ═══════════════════════════════════════════════════════ MODAL ═══ -->
