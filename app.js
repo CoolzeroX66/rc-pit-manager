@@ -1111,6 +1111,216 @@ const SetupController = {
 };
 
 /* ════════════════════════════════════════════════════════════════════════════
+   ANALYSE PARSER
+   ════════════════════════════════════════════════════════════════════════════ */
+const AnalyseParser = {
+  async parse(file) {
+    const pageTexts = await PDFParser.extractText(file);
+    if (!pageTexts) throw new Error('PDF konnte nicht gelesen werden (pdf.js nicht verfügbar?)');
+    const text = pageTexts.join('\n');
+    return this._parseText(text);
+  },
+
+  _parseText(raw) {
+    const text = raw.replace(/\r/g, '');
+    const drivers = this._parseDrivers(text);
+    if (!drivers.length) throw new Error('Keine Fahrerdaten gefunden – Ist es eine RCM-Ergebnisliste?');
+    const lapRows = this._parseLapTimes(text);
+    drivers.forEach((d, i) => {
+      d.lapTimes = lapRows.map(row => (i < row.length ? row[i] : null)).filter(t => t !== null);
+    });
+    return { drivers, raceName: this._raceName(text) };
+  },
+
+  _raceName(text) {
+    const m = text.match(/((?:[A-Z]-)?Finale[^\n|]{0,40}|Vorlauf\s*\d+)/i);
+    return m ? m[1].trim() : 'Rennen';
+  },
+
+  _parseDrivers(text) {
+    const list = [];
+    // Columns: Pos Nr Name(lazy) Rundenzeit Rnd Absolutzeit Bestzeit Mediumzeit StDev
+    const re = /^\s*(\d{1,2})\s+(\d{1,3})\s+(.+?)\s+(\d+\.\d{3})\s+(\d+)\s+(\d+:[\d.]+)\s+(\d+\.\d{3})\s+(\d+\.\d{3})\s+(\d+\.\d{3})/gm;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const name = m[3].trim();
+      if (!name || /^[\d]/.test(name)) continue;
+      list.push({
+        pos:      +m[1],
+        nr:       m[2],
+        name,
+        laps:     +m[5],
+        bestTime: +m[7],
+        medTime:  +m[8],
+        stdev:    +m[9],
+        lapTimes: []
+      });
+    }
+    return list.sort((a, b) => a.pos - b.pos);
+  },
+
+  _parseLapTimes(text) {
+    const idx = text.search(/Rundenzeiten/i);
+    if (idx < 0) return [];
+    const rows = [];
+    const section = text.slice(idx + 12);
+    for (const line of section.split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      if (/^[A-Za-zÄÖÜäöü]/.test(t)) break;
+      const parts = t.split(/\s+/);
+      if (isNaN(parseInt(parts[0], 10))) continue;
+      const times = parts.slice(1).map(Number).filter(x => !isNaN(x) && x > 0);
+      if (times.length) rows.push(times);
+    }
+    return rows;
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ANALYSE CONTROLLER
+   ════════════════════════════════════════════════════════════════════════════ */
+const AnalyseController = {
+  init() {
+    const inp = document.getElementById('input-analyse');
+    inp.value = '';
+    document.getElementById('fname-analyse').textContent = 'PDF-Datei auswählen…';
+    const st = document.getElementById('status-analyse');
+    st.className = 'parse-status';
+    st.textContent = '';
+    document.getElementById('analyse-result').classList.add('hidden');
+    document.getElementById('analyse-upload-wrap').classList.remove('hidden');
+    inp.onchange = e => { if (e.target.files[0]) this._load(e.target.files[0]); };
+    this._bindDrop('drop-analyse', f => this._load(f));
+  },
+
+  _bindDrop(id, cb) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const f = e.dataTransfer.files[0];
+      if (f) cb(f);
+    });
+  },
+
+  async _load(file) {
+    const st = document.getElementById('status-analyse');
+    document.getElementById('fname-analyse').textContent = file.name;
+    document.getElementById('fname-analyse').classList.add('selected');
+    st.className = 'parse-status loading';
+    st.innerHTML = '<span class="spinner"></span> Analysiere…';
+    try {
+      const result = await AnalyseParser.parse(file);
+      const maxLaps = Math.max(...result.drivers.map(d => d.lapTimes.length), 0);
+      st.className = 'parse-status ok';
+      st.textContent = `✓ ${result.drivers.length} Fahrer · ${maxLaps} Runden`;
+      this._renderResult(result);
+    } catch (err) {
+      st.className = 'parse-status error';
+      st.textContent = `✕ ${err.message}`;
+    }
+  },
+
+  _renderResult(result) {
+    const { drivers, raceName } = result;
+    const maxLaps = Math.max(...drivers.map(d => d.lapTimes.length), 0);
+
+    // Overall fastest lap across all drivers (skip lap index 0 = standing start)
+    let globalBest = Infinity;
+    drivers.forEach(d => d.lapTimes.slice(1).forEach(t => { if (t < globalBest) globalBest = t; }));
+
+    // Personal best per driver from actual lap times
+    drivers.forEach(d => { d.pb = d.lapTimes.slice(1).length ? Math.min(...d.lapTimes.slice(1)) : Infinity; });
+
+    // Header row
+    let thead = '<tr><th class="lt-sticky lt-col-lap">#</th>';
+    drivers.forEach(d => {
+      thead += `<th class="lt-col-driver">
+        <div class="lt-drv-pos">P${d.pos}</div>
+        <div class="lt-drv-nr">#${d.nr}</div>
+        <div class="lt-drv-name">${d.name}</div>
+        <div class="lt-drv-spark">${this._spark(d.lapTimes)}</div>
+      </th>`;
+    });
+    thead += '</tr>';
+
+    // Data rows
+    let tbody = '';
+    for (let i = 0; i < maxLaps; i++) {
+      tbody += `<tr><td class="lt-sticky lt-lap-num">${i + 1}</td>`;
+      drivers.forEach(d => {
+        const t = d.lapTimes[i];
+        if (t == null) { tbody += '<td class="lt-time lt-empty">—</td>'; return; }
+        let cls = 'lt-time';
+        if (i === 0)           cls += ' lt-start';
+        else if (t === globalBest) cls += ' lt-fastest';
+        else if (t === d.pb)   cls += ' lt-pb';
+        else if (t > d.pb * 1.08) cls += ' lt-slow';
+        tbody += `<td class="${cls}">${t.toFixed(3)}</td>`;
+      });
+      tbody += '</tr>';
+    }
+
+    // Summary row
+    tbody += '<tr class="lt-sum-row"><td class="lt-sticky lt-lap-num">Ø</td>';
+    drivers.forEach(d => {
+      tbody += `<td class="lt-summary">
+        <div class="lt-sum-val">${d.medTime.toFixed(3)}</div>
+        <div class="lt-sum-dev">σ ${d.stdev.toFixed(3)}</div>
+      </td>`;
+    });
+    tbody += '</tr>';
+
+    const resultEl = document.getElementById('analyse-result');
+    resultEl.innerHTML = `
+      <div class="analyse-meta">
+        <div class="am-item"><span class="am-label">Rennen</span><span class="am-value">${raceName}</span></div>
+        <div class="am-item"><span class="am-label">Fahrer</span><span class="am-value">${drivers.length}</span></div>
+        <div class="am-item"><span class="am-label">Runden</span><span class="am-value">${maxLaps}</span></div>
+      </div>
+      <div class="lap-table-wrap">
+        <table class="lap-table">
+          <thead>${thead}</thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>
+      <div class="lt-legend">
+        <span class="lt-legend-item"><span class="lt-legend-dot lt-fastest"></span>Schnellste Runde</span>
+        <span class="lt-legend-item"><span class="lt-legend-dot lt-pb"></span>Pers. Bestzeit</span>
+        <span class="lt-legend-item"><span class="lt-legend-dot lt-slow"></span>&gt;8% über Bestzeit</span>
+      </div>
+      <div class="container mb-2 mt-1">
+        <button class="btn btn-secondary btn-full" id="btn-analyse-new" style="min-height:40px;font-size:0.82rem;">
+          &#128202; Andere Datei laden
+        </button>
+      </div>
+    `;
+    resultEl.classList.remove('hidden');
+    document.getElementById('analyse-upload-wrap').classList.add('hidden');
+
+    document.getElementById('btn-analyse-new').addEventListener('click', () => this.init());
+  },
+
+  _spark(times) {
+    const vals = times.slice(1);
+    if (vals.length < 3) return '';
+    const w = 64, h = 20, p = 2;
+    const mn = Math.min(...vals), mx = Math.max(...vals);
+    const rng = mx - mn || 0.001;
+    const pts = vals.map((t, i) => {
+      const x = (p + (i / (vals.length - 1)) * (w - p * 2)).toFixed(1);
+      const y = (h - p - ((t - mn) / rng) * (h - p * 2)).toFixed(1);
+      return `${x},${y}`;
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="lt-spark"><polyline points="${pts}" fill="none" stroke="rgba(255,107,0,0.55)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
    SUMMARY RENDERER
    ════════════════════════════════════════════════════════════════════════════ */
 const SummaryRenderer = {
@@ -1144,6 +1354,9 @@ const SummaryRenderer = {
    APP — bootstrap and navigation
    ════════════════════════════════════════════════════════════════════════════ */
 const App = {
+  _currentView: null,
+  _prevView:    null,
+
   init() {
     State.load();
     State.migrate();
@@ -1164,14 +1377,18 @@ const App = {
   },
 
   showView(id) {
+    this._prevView    = this._currentView;
+    this._currentView = id;
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     const target = document.getElementById(`view-${id}`);
     if (target) target.classList.add('active');
 
     const btnReset    = document.getElementById('btn-nav-reset');
     const btnSettings = document.getElementById('btn-nav-settings');
-    btnReset.classList.toggle('hidden', id === 'setup');
+    const btnAnalyse  = document.getElementById('btn-nav-analyse');
+    btnReset.classList.toggle('hidden', id === 'setup' || id === 'analyse');
     btnSettings.classList.toggle('hidden', id !== 'dashboard');
+    if (btnAnalyse) btnAnalyse.classList.toggle('active-analyse', id === 'analyse');
   },
 
   launchDashboard() {
@@ -1211,6 +1428,18 @@ const App = {
       dash.globalOffsetMs = (dash.globalOffsetMs || 0) + (delta * 1000);
       State.save();
       DashboardRenderer.renderPanel(dashIdx);
+    });
+
+    document.getElementById('btn-nav-analyse').addEventListener('click', () => {
+      CountdownController.stop();
+      this.showView('analyse');
+      AnalyseController.init();
+    });
+
+    document.getElementById('btn-analyse-back').addEventListener('click', () => {
+      const dest = this._prevView || 'setup';
+      this.showView(dest);
+      if (dest === 'dashboard') CountdownController.start();
     });
 
     document.getElementById('btn-nav-settings').addEventListener('click', () => {
